@@ -1,0 +1,132 @@
+{
+  "name": "Telegram AI Bot (Image + Video)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          {
+            "updateKey": "message",
+            "updateValue": "={{$json[\"message\"]}}"
+          }
+        ]
+      },
+      "id": "Webhook-Telegram",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookDescription": "Triggers when Telegram message is received"
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json[\"message\"][\"chat\"][\"id\"]}}",
+        "text": "🎨 Hai! Kirimkan prompt kamu (teks deskripsi gambar/video) ke sini ✨"
+      },
+      "id": "Welcome-Message",
+      "name": "Send Welcome",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [480, 300],
+      "credentials": { "telegramApi": "={{$env.TELEGRAM_TOKEN}}" }
+    },
+    {
+      "parameters": {
+        "functionCode": "const prompt = $json[\"message\"][\"text\"] || '';\nreturn [{ prompt }];"
+      },
+      "id": "Extract-Prompt",
+      "name": "Extract Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "apiKey",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{$env.GOOGLE_API_KEY}}",
+        "method": "POST",
+        "sendBody": true,
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "{\"contents\":[{\"parts\":[{\"text\":\"{{$json[\"prompt\"]}}\"}]}]}"
+      },
+      "id": "Google-Gemini",
+      "name": "Generate Image Prompt (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const text = $json[\"candidates\"][0][\"content\"][\"parts\"][0][\"text\"];\nreturn [{ imagePrompt: text }];"
+      },
+      "id": "Extract-ImagePrompt",
+      "name": "Extract Image Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "url": "https://api.replicate.com/v1/predictions",
+        "method": "POST",
+        "sendBody": true,
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "{\"version\":\"{{ $json.version || 'c4f83e9b87d3aabc1d77e42e75b3adf79645d1b7dd67e6a7a2a76fef27d4aee6' }}\",\"input\":{\"prompt\":\"{{$json[\"imagePrompt\"]}}\"}}",
+        "headerParametersJson": "{\"Authorization\":\"Token {{$env.REPLICATE_API_TOKEN}}\",\"Content-Type\":\"application/json\"}"
+      },
+      "id": "Replicate-Video",
+      "name": "Generate Video (Replicate)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1440, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const url = $json[\"output\"] ? $json[\"output\"][0] : 'No output URL';\nreturn [{ resultUrl: url }];"
+      },
+      "id": "Extract-VideoURL",
+      "name": "Extract Video URL",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1680, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json[\"message\"][\"chat\"][\"id\"]}}",
+        "text": "✅ Video kamu siap! Lihat hasilnya di sini:\n{{$json[\"resultUrl\"]}}"
+      },
+      "id": "Send-Result",
+      "name": "Send Result",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1920, 300],
+      "credentials": { "telegramApi": "={{$env.TELEGRAM_TOKEN}}" }
+    }
+  ],
+  "connections": {
+    "Webhook-Telegram": {
+      "main": [[{ "node": "Welcome-Message", "type": "main", "index": 0 }]]
+    },
+    "Welcome-Message": {
+      "main": [[{ "node": "Extract-Prompt", "type": "main", "index": 0 }]]
+    },
+    "Extract-Prompt": {
+      "main": [[{ "node": "Google-Gemini", "type": "main", "index": 0 }]]
+    },
+    "Google-Gemini": {
+      "main": [[{ "node": "Extract-ImagePrompt", "type": "main", "index": 0 }]]
+    },
+    "Extract-ImagePrompt": {
+      "main": [[{ "node": "Replicate-Video", "type": "main", "index": 0 }]]
+    },
+    "Replicate-Video": {
+      "main": [[{ "node": "Extract-VideoURL", "type": "main", "index": 0 }]]
+    },
+    "Extract-VideoURL": {
+      "main": [[{ "node": "Send-Result", "type": "main", "index": 0 }]]
+    }
+  }
+}
