@@ -1,0 +1,12 @@
+{
+  "name": "n8n-telegram-ai-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot AI (image + video) running on Render using n8n",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "n8n": "^1.80.0"
+  }
+}
